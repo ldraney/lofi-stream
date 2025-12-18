@@ -116,10 +116,15 @@ ffmpeg -f x11grab -video_size 1920x1080 -i :99 \
 
 ## Current Status
 
-**Phase:** COMPLETE - Stream is LIVE!
+**Phase:** MVP complete, investigating issues
 **GitHub Pages:** https://ldraney.github.io/lofi-stream/
 **Server:** 5.78.42.22 (systemd enabled, auto-restarts)
-**YouTube:** Streaming 24/7
+**YouTube:** Stream disconnected - needs restart
+
+### Known Issues (see [Issue #1](https://github.com/ldraney/lofi-stream/issues/1))
+
+1. **Audio not working on GitHub Pages site** - Web Audio API may need user interaction
+2. **YouTube stream disconnected** - YouTube ended stream, server still running
 
 ### Quick Commands
 ```bash
@@ -135,6 +140,9 @@ journalctl -u lofi-stream -f
 # Restart stream
 systemctl restart lofi-stream
 
+# Check if RTMP connected to YouTube
+ss -tn | grep 1935
+
 # Monitor resources
 top -bn1 | head -15 && free -h
 ```
@@ -143,18 +151,18 @@ top -bn1 | head -15 && free -h
 
 ## Performance Analysis
 
-**Resource usage with 1 stream (CX22 - 2 vCPU, 2GB RAM):**
+**Resource usage with 1 stream (CX22 - 2 vCPU, 2GB RAM) - OPTIMIZED:**
 
 | Resource | Used | Capacity | Status |
 |----------|------|----------|--------|
-| CPU | ~91% | 2 vCPU | MAXED |
-| RAM | 928MB (49%) | 1.9GB | OK |
-| Network | ~1 Mbps | ~1 Gbps | OK |
+| CPU | ~23% | 2 vCPU | OK |
+| RAM | 350MB (18%) | 1.9GB | OK |
+| Network | ~1.6 Mbps | ~1 Gbps | OK |
 | Disk | 3.9GB (11%) | 38GB | OK |
 
-**Bottleneck:** CPU (ffmpeg ~90%, Chromium ~100%)
+**Current settings:** 720p @ 24fps, ultrafast preset, 1.5Mbps CBR
 
-**This server can run exactly 1 stream.**
+**This server can now potentially run 2-3 streams with current optimization.**
 
 ### Scaling Options
 
