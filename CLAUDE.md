@@ -1,131 +1,12 @@
-# lofi-stream
+# lofi-stream-youtube
 
-Stream a lofi HTML page from GitHub Pages to YouTube Live via a Hetzner VPS.
+YouTube streaming component (Night City theme) of the lofi-stream project. Captures a GitHub Pages lofi site and streams it 24/7 to YouTube Live.
 
-## Project Goal
+> **Full project docs & roadmap:** [lofi-stream-docs](https://github.com/ldraney/lofi-stream-docs)
+> **Sister project:** [lofi-stream-twitch](https://github.com/ldraney/lofi-stream-twitch) (Coffee Shop theme)
 
-A 24/7 YouTube live stream displaying a lofi-style HTML page with ambient visuals and music.
+## Quick Reference
 
-## Architecture
-
-```
-GitHub Pages (static HTML)
-        │
-        ▼
-Hetzner VPS (CX22 ~€4.50/mo)
-  ├── Xvfb (virtual display)
-  ├── Chromium (renders page)
-  └── ffmpeg (captures + RTMP stream)
-        │
-        ▼
-YouTube Live (RTMP ingest)
-```
-
-## Definition of Done
-
-The project is complete when:
-- [x] YouTube live stream is running 24/7
-- [x] Stream displays the lofi HTML page with visuals
-- [x] Audio is playing (generative lofi via Web Audio API)
-- [x] Stream auto-recovers from crashes (systemd Restart=always)
-- [x] Minimal maintenance required
-
----
-
-## Roadmap
-
-### Phase 1: Lofi HTML Page
-- [x] Create basic HTML/CSS lofi page
-- [x] Add ambient visuals (rain, particles, animations)
-- [x] Add lofi audio (Web Audio API generative - no copyright issues!)
-- [x] Deploy to GitHub Pages - https://ldraney.github.io/lofi-stream/
-- [x] Test page loads and plays correctly
-
-### Phase 2: Hetzner VPS Setup
-- [x] Provision Hetzner VPS (Ubuntu 24.04, 2GB RAM)
-- [x] SSH access configured (5.78.42.22)
-- [x] Install dependencies: Xvfb, Chromium, ffmpeg, pulseaudio, xdotool
-- [x] Test headless browser can render the page
-
-### Phase 3: Streaming Pipeline
-- [x] Create streaming script (start Xvfb, launch Chromium, run ffmpeg)
-- [x] Configure ffmpeg for YouTube RTMP output
-- [x] Test stream to YouTube
-- [x] Tune encoding settings (1080p, 3Mbps, AAC audio)
-
-### Phase 4: Production Hardening
-- [x] Create systemd service for auto-start
-- [x] Add crash recovery / restart logic (Restart=always)
-- [x] Systemd enabled on boot
-- [x] Go live!
-
-### Phase 5: Polish (Optional)
-- [ ] Add stream title/description rotation
-- [ ] Dynamic visuals based on time of day
-- [ ] Chat integration or viewer count overlay
-- [ ] Multiple audio sources / playlist
-
----
-
-## Key Files
-
-```
-lofi-stream/
-├── CLAUDE.md           # This file
-├── docs/               # GitHub Pages lofi site (renamed from site/)
-│   ├── index.html      # Main page with visuals + Web Audio API
-│   └── style.css       # All animations and styling
-├── server/             # VPS scripts (to be created)
-│   ├── stream.sh       # Main streaming script
-│   ├── setup.sh        # Server setup script
-│   └── lofi-stream.service  # systemd unit
-└── README.md
-```
-
-## Tech Stack
-
-- **Frontend:** HTML, CSS, vanilla JS (keep it simple)
-- **Audio:** Embedded MP3s or Web Audio API generated lofi
-- **Server:** Ubuntu 22.04 on Hetzner CX22
-- **Streaming:** Xvfb + Chromium + ffmpeg + PulseAudio
-- **Hosting:** GitHub Pages (free)
-
-## YouTube Setup Notes
-
-1. Go to YouTube Studio → Go Live → Stream
-2. Get Stream Key (keep secret!)
-3. RTMP URL: `rtmp://a.rtmp.youtube.com/live2`
-4. Set stream to 720p or 1080p, 30fps is fine for lofi
-
-## Useful Commands
-
-```bash
-# Start virtual display
-Xvfb :99 -screen 0 1920x1080x24 &
-
-# Launch Chromium on virtual display
-DISPLAY=:99 chromium --kiosk --autoplay-policy=no-user-gesture-required https://yourpage.github.io/lofi
-
-# Stream to YouTube
-ffmpeg -f x11grab -video_size 1920x1080 -i :99 \
-       -f pulse -i default \
-       -c:v libx264 -preset veryfast -b:v 3000k \
-       -c:a aac -b:a 128k \
-       -f flv rtmp://a.rtmp.youtube.com/live2/YOUR_STREAM_KEY
-```
-
-## Current Status
-
-**Phase:** Production - fully working!
-**GitHub Pages:** https://ldraney.github.io/lofi-stream/
-**Server:** 5.78.42.22 (systemd enabled, auto-restarts)
-**YouTube:** Live and streaming with audio!
-
-### Resolved Issues
-
-1. **Audio not reaching YouTube** - Fixed! See "Lessons Learned" below
-
-### Quick Commands
 ```bash
 # SSH to server
 ssh -i ~/api-secrets/hetzner-server/id_ed25519 root@5.78.42.22
@@ -139,85 +20,133 @@ journalctl -u lofi-stream -f
 # Restart stream
 systemctl restart lofi-stream
 
-# Check if RTMP connected to YouTube
+# Check RTMP connection
 ss -tn | grep 1935
 
 # Monitor resources
 top -bn1 | head -15 && free -h
 ```
 
----
+## Dev Server (Testing)
 
-## Performance Analysis
+Use the dev server (5.78.42.22 as `lofidev` user) to test changes before deploying to production.
 
-**Resource usage with 1 stream (CX22 - 2 vCPU, 2GB RAM) - OPTIMIZED:**
+```bash
+# Deploy this repo to dev server
+make deploy-dev
 
-| Resource | Used | Capacity | Status |
-|----------|------|----------|--------|
-| CPU | ~23% | 2 vCPU | OK |
-| RAM | 350MB (18%) | 1.9GB | OK |
-| Network | ~1.6 Mbps | ~1 Gbps | OK |
-| Disk | 3.9GB (11%) | 38GB | OK |
+# Check what's deployed
+make dev-status
 
-**Current settings:** 720p @ 24fps, ultrafast preset, 1.5Mbps CBR
+# Clean up when done testing
+make cleanup-dev
 
-**This server can now potentially run 2-3 streams with current optimization.**
+# Full dev server reset (kills all processes, cleans home dir)
+make dev-reset
 
-### Scaling Options
+# View reset logs
+make dev-logs
+```
 
-| Streams | Server | vCPU | Cost/mo |
-|---------|--------|------|---------|
-| 1 | CX22 | 2 | €4.50 |
-| 2-3 | CX32 | 4 | €7.50 |
-| 4-6 | CX42 | 8 | €14 |
-| 10+ | Multiple VPS | - | €45+ |
+**When to use dev server:**
+- Testing changes to `docs/` (the lofi page)
+- Testing changes to `server/` scripts
+- Debugging stream issues without affecting production
 
-### Optimization Ideas (to reduce CPU)
-- Drop to 720p (saves ~40% CPU)
-- Lower framerate to 24fps
-- Use ffmpeg `-preset ultrafast` instead of `veryfast`
-- Pre-render video loop instead of live capture
+**Dev server resets daily at 4 AM UTC** - any deployments will be cleaned up automatically.
+
+## Current Status
+
+| Component | Value |
+|-----------|-------|
+| Phase | Production (complete) |
+| GitHub Pages | https://ldraney.github.io/lofi-stream/ |
+| Server | 5.78.42.22 |
+| Resolution | 720p @ 24fps |
+| Bitrate | 1.5 Mbps video, 128k audio |
+| Service | systemd (Restart=always) |
+
+## Repository Structure
+
+```
+lofi-stream-youtube/
+├── CLAUDE.md              # This file
+├── Makefile               # Dev server deploy/cleanup
+├── README.md              # Public readme
+├── status.sh              # Quick status check
+├── docs/                  # GitHub Pages lofi site
+│   ├── index.html         # Visuals + Web Audio API
+│   └── style.css          # Animations
+└── server/                # VPS scripts
+    ├── stream.sh          # Main streaming script
+    ├── setup.sh           # Server setup
+    ├── lofi-stream.service # systemd unit
+    └── health-check.sh    # Health monitoring
+```
+
+## YouTube Setup
+
+1. Go to YouTube Studio > Go Live > Stream
+2. Get Stream Key (keep secret!)
+3. RTMP URL: `rtmp://a.rtmp.youtube.com/live2`
+4. Recommended: 720p, 24-30fps for lofi content
+
+## Definition of Done (YouTube Component)
+
+- [x] YouTube live stream running 24/7
+- [x] Stream displays lofi HTML page with visuals
+- [x] Audio playing (Web Audio API generative)
+- [x] Auto-recovery from crashes (systemd)
+- [x] Minimal maintenance required
 
 ---
 
 ## Lessons Learned
 
-### PulseAudio + ffmpeg Audio Issue (Dec 2024)
+### PulseAudio + ffmpeg Audio Issue
 
-**Problem:** YouTube stream had video but NO audio, even though local audio capture tests worked fine.
+**Problem:** YouTube stream had video but NO audio.
 
 **Symptoms:**
 - `pactl list sink-inputs` showed Chromium playing audio
-- `parec` could capture audio samples locally
-- ffmpeg logs showed it was "reading" from `virtual_speaker.monitor`
-- BUT `pactl list source-outputs` was **empty** - ffmpeg wasn't actually connected!
+- ffmpeg logs showed "reading" from `virtual_speaker.monitor`
+- BUT `pactl list source-outputs` was **empty**
 
-**Root Cause:**
-ffmpeg didn't have the `PULSE_SERVER` environment variable set. When running under systemd, ffmpeg couldn't find the PulseAudio server socket automatically.
+**Root Cause:** ffmpeg didn't have `PULSE_SERVER` environment variable set under systemd.
 
 **Fix:**
-Export `PULSE_SERVER` explicitly before running ffmpeg:
 ```bash
 export XDG_RUNTIME_DIR=/run/user/0
 export PULSE_SERVER=unix:/run/user/0/pulse/native
-
-# Then run ffmpeg with the same env
-PULSE_SERVER=unix:/run/user/0/pulse/native ffmpeg \
-    -f pulse -i virtual_speaker.monitor \
-    ...
 ```
 
-**Debugging Commands:**
+**Debugging:**
 ```bash
-# Check if ffmpeg is ACTUALLY reading from PulseAudio
-pactl list source-outputs  # Should show ffmpeg as a client
-
-# If empty, ffmpeg is NOT connected!
-# Check what pulse server pactl uses
-pactl info | grep "Server String"
+# Verify ffmpeg is ACTUALLY connected to PulseAudio
+pactl list source-outputs  # Should show ffmpeg
 
 # Test audio levels
 ffmpeg -f pulse -i virtual_speaker.monitor -af volumedetect -t 2 -f null -
 ```
 
-**Key Insight:** Just because ffmpeg says `Input #1, pulse, from 'virtual_speaker.monitor'` doesn't mean it's actually receiving audio. Always verify with `pactl list source-outputs`.
+**Key Insight:** Just because ffmpeg says `Input #1, pulse` doesn't mean it's receiving audio. Always verify with `pactl list source-outputs`.
+
+---
+
+## Useful Commands
+
+```bash
+# Start virtual display manually
+Xvfb :99 -screen 0 1280x720x24 &
+
+# Launch Chromium on virtual display
+DISPLAY=:99 chromium --kiosk --autoplay-policy=no-user-gesture-required \
+    https://ldraney.github.io/lofi-stream/
+
+# Stream to YouTube manually
+ffmpeg -f x11grab -video_size 1280x720 -framerate 24 -i :99 \
+       -f pulse -i virtual_speaker.monitor \
+       -c:v libx264 -preset ultrafast -b:v 1500k \
+       -c:a aac -b:a 128k \
+       -f flv rtmp://a.rtmp.youtube.com/live2/YOUR_STREAM_KEY
+```
