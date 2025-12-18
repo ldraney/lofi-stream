@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>lofi stream</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="rain"></div>
+
+  <div class="window">
+    <div class="window-frame">
+      <div class="city">
+        <div class="building b1"></div>
+        <div class="building b2"></div>
+        <div class="building b3"></div>
+        <div class="building b4"></div>
+        <div class="building b5"></div>
+        <div class="building b6"></div>
+        <div class="building b7"></div>
+      </div>
+      <div class="moon"></div>
+    </div>
+    <div class="windowsill">
+      <div class="plant">
+        <div class="pot"></div>
+        <div class="stem"></div>
+        <div class="leaf l1"></div>
+        <div class="leaf l2"></div>
+        <div class="leaf l3"></div>
+      </div>
+      <div class="cup">
+        <div class="steam s1"></div>
+        <div class="steam s2"></div>
+        <div class="steam s3"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info">
+    <div class="title">lofi beats to relax/study to</div>
+    <div class="equalizer">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <audio id="audio" loop autoplay>
+    <!-- Add your lofi audio source here -->
+    <!-- <source src="assets/lofi.mp3" type="audio/mpeg"> -->
+  </audio>
+
+  <script>
+    // Generate rain drops
+    const rain = document.querySelector('.rain');
+    for (let i = 0; i < 100; i++) {
+      const drop = document.createElement('div');
+      drop.className = 'drop';
+      drop.style.left = Math.random() * 100 + '%';
+      drop.style.animationDuration = (Math.random() * 0.5 + 0.5) + 's';
+      drop.style.animationDelay = Math.random() * 2 + 's';
+      rain.appendChild(drop);
+    }
+  </script>
+</body>
+</html>
