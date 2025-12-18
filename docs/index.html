@@ -45,11 +45,6 @@
     </div>
   </div>
 
-  <audio id="audio" loop autoplay>
-    <!-- Add your lofi audio source here -->
-    <!-- <source src="assets/lofi.mp3" type="audio/mpeg"> -->
-  </audio>
-
   <script>
     // Generate rain drops
     const rain = document.querySelector('.rain');
@@ -61,6 +56,127 @@
       drop.style.animationDelay = Math.random() * 2 + 's';
       rain.appendChild(drop);
     }
+
+    // Web Audio API - Generative Lofi Ambient
+    let audioStarted = false;
+
+    function startAudio() {
+      if (audioStarted) return;
+      audioStarted = true;
+
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const masterGain = ctx.createGain();
+      masterGain.gain.value = 0.3;
+      masterGain.connect(ctx.destination);
+
+      // Brown noise for rain ambience
+      const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+      const noiseData = noiseBuffer.getChannelData(0);
+      let lastOut = 0;
+      for (let i = 0; i < noiseBuffer.length; i++) {
+        const white = Math.random() * 2 - 1;
+        noiseData[i] = (lastOut + (0.02 * white)) / 1.02;
+        lastOut = noiseData[i];
+        noiseData[i] *= 3.5;
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuffer;
+      noise.loop = true;
+      const noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = 'lowpass';
+      noiseFilter.frequency.value = 400;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.value = 0.15;
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(masterGain);
+      noise.start();
+
+      // Lofi chord pad
+      const chords = [
+        [261.63, 329.63, 392.00], // C maj
+        [220.00, 277.18, 329.63], // A min
+        [349.23, 440.00, 523.25], // F maj
+        [392.00, 493.88, 587.33], // G maj
+      ];
+
+      function playPad(freqs, startTime, duration) {
+        freqs.forEach(freq => {
+          const osc = ctx.createOscillator();
+          osc.type = 'sine';
+          osc.frequency.value = freq * 0.5; // One octave down
+
+          const oscGain = ctx.createGain();
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.value = 800;
+
+          osc.connect(filter);
+          filter.connect(oscGain);
+          oscGain.connect(masterGain);
+
+          oscGain.gain.setValueAtTime(0, startTime);
+          oscGain.gain.linearRampToValueAtTime(0.08, startTime + 0.5);
+          oscGain.gain.linearRampToValueAtTime(0.05, startTime + duration - 0.5);
+          oscGain.gain.linearRampToValueAtTime(0, startTime + duration);
+
+          osc.start(startTime);
+          osc.stop(startTime + duration);
+        });
+      }
+
+      function scheduleChords() {
+        const now = ctx.currentTime;
+        const chordDuration = 4;
+        chords.forEach((chord, i) => {
+          playPad(chord, now + i * chordDuration, chordDuration);
+        });
+        setTimeout(scheduleChords, chords.length * chordDuration * 1000);
+      }
+      scheduleChords();
+
+      // Soft sub bass drone
+      const drone = ctx.createOscillator();
+      drone.type = 'sine';
+      drone.frequency.value = 55; // A1
+      const droneGain = ctx.createGain();
+      droneGain.gain.value = 0.1;
+      const droneFilter = ctx.createBiquadFilter();
+      droneFilter.type = 'lowpass';
+      droneFilter.frequency.value = 100;
+      drone.connect(droneFilter);
+      droneFilter.connect(droneGain);
+      droneGain.connect(masterGain);
+      drone.start();
+
+      // Soft vinyl crackle
+      const crackleBuffer = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
+      const crackleData = crackleBuffer.getChannelData(0);
+      for (let i = 0; i < crackleBuffer.length; i++) {
+        crackleData[i] = Math.random() > 0.99 ? (Math.random() * 0.5 - 0.25) : 0;
+      }
+      const crackle = ctx.createBufferSource();
+      crackle.buffer = crackleBuffer;
+      crackle.loop = true;
+      const crackleGain = ctx.createGain();
+      crackleGain.gain.value = 0.3;
+      crackle.connect(crackleGain);
+      crackleGain.connect(masterGain);
+      crackle.start();
+
+      console.log('Lofi audio started');
+    }
+
+    // Auto-start for streaming (no user interaction needed on server)
+    // For browser, we need user interaction
+    document.addEventListener('click', startAudio, { once: true });
+    document.addEventListener('keydown', startAudio, { once: true });
+
+    // Try to auto-start (works when autoplay is allowed)
+    setTimeout(() => {
+      startAudio();
+    }, 1000);
   </script>
 </body>
 </html>
