@@ -9,7 +9,7 @@ DISPLAY_NUM=99
 RESOLUTION="1280x720"
 FPS=24
 YOUTUBE_URL="rtmp://a.rtmp.youtube.com/live2"
-PAGE_URL="https://ldraney.github.io/lofi-stream/"
+PAGE_URL="https://ldraney.github.io/lofi-stream-youtube/"
 
 # Check for YouTube stream key
 if [ -z "$YOUTUBE_KEY" ]; then
@@ -35,10 +35,17 @@ sleep 2
 
 export DISPLAY=:$DISPLAY_NUM
 
-# Start PulseAudio for audio capture
-echo "Starting PulseAudio..."
-pulseaudio --start --exit-idle-time=-1 2>/dev/null || true
+# PulseAudio setup (shared with other streams - don't start new instance)
+echo "Setting up PulseAudio..."
+export XDG_RUNTIME_DIR=/run/user/$(id -u)
+mkdir -p $XDG_RUNTIME_DIR
+
+# Ensure PulseAudio is running (only start if not already running)
+pulseaudio --check || pulseaudio --start --exit-idle-time=-1
 sleep 2
+
+# Export PULSE_SERVER for ffmpeg
+export PULSE_SERVER=unix:$XDG_RUNTIME_DIR/pulse/native
 
 # Create virtual audio sink if it doesn't exist and set as default
 echo "Setting up audio routing..."
@@ -101,7 +108,7 @@ SINK_INPUT=$(pactl list sink-inputs 2>/dev/null | grep -B 20 "window.x11.display
 
 # Start streaming with ffmpeg - with proper buffering
 echo "Starting ffmpeg stream to YouTube..."
-ffmpeg \
+PULSE_SERVER=unix:$XDG_RUNTIME_DIR/pulse/native ffmpeg \
     -thread_queue_size 1024 \
     -f x11grab -video_size $RESOLUTION -framerate $FPS -draw_mouse 0 -i :$DISPLAY_NUM \
     -thread_queue_size 1024 \
