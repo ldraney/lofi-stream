@@ -40,9 +40,11 @@ echo "Starting PulseAudio..."
 pulseaudio --start --exit-idle-time=-1 2>/dev/null || true
 sleep 2
 
-# Create virtual audio sink and set as default
+# Create virtual audio sink if it doesn't exist and set as default
 echo "Setting up audio routing..."
-pactl load-module module-null-sink sink_name=virtual_speaker sink_properties=device.description=VirtualSpeaker 2>/dev/null || true
+if ! pactl list sinks short 2>/dev/null | grep -q "	virtual_speaker	"; then
+    pactl load-module module-null-sink sink_name=virtual_speaker sink_properties=device.description=VirtualSpeaker 2>/dev/null || true
+fi
 pactl set-default-sink virtual_speaker 2>/dev/null || true
 sleep 1
 
@@ -75,8 +77,27 @@ if command -v xdotool &> /dev/null; then
 fi
 sleep 3
 
-# Ensure Chrome audio goes to virtual speaker
-pactl list short sink-inputs | awk '{print $1}' | xargs -I {} pactl move-sink-input {} virtual_speaker 2>/dev/null || true
+# Background audio routing monitor - keeps audio routed correctly
+audio_monitor() {
+    while true; do
+        SINK_INPUT=$(pactl list sink-inputs 2>/dev/null | grep -B 20 "window.x11.display = \":$DISPLAY_NUM\"" | grep "Sink Input" | grep -oP '#\K\d+' | tail -1 || true)
+        if [ -n "$SINK_INPUT" ]; then
+            CURRENT=$(pactl list sink-inputs 2>/dev/null | grep -A 5 "Sink Input #$SINK_INPUT" | grep "Sink:" | awk '{print $2}' || true)
+            EXPECTED=$(pactl list sinks short 2>/dev/null | grep "	virtual_speaker	" | cut -f1 || true)
+            if [ -n "$EXPECTED" ] && [ "$CURRENT" != "$EXPECTED" ]; then
+                pactl move-sink-input $SINK_INPUT virtual_speaker 2>/dev/null && echo "Audio rerouted to virtual_speaker"
+            fi
+        fi
+        sleep 5
+    done
+}
+audio_monitor &
+echo "Started audio monitor"
+
+# Initial routing attempt
+sleep 3
+SINK_INPUT=$(pactl list sink-inputs 2>/dev/null | grep -B 20 "window.x11.display = \":$DISPLAY_NUM\"" | grep "Sink Input" | grep -oP '#\K\d+' | tail -1 || true)
+[ -n "$SINK_INPUT" ] && pactl move-sink-input $SINK_INPUT virtual_speaker 2>/dev/null && echo "Initial route: sink-input $SINK_INPUT → virtual_speaker"
 
 # Start streaming with ffmpeg - with proper buffering
 echo "Starting ffmpeg stream to YouTube..."
